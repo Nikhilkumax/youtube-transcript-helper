@@ -227,11 +227,14 @@ serve(async (req) => {
 
         // Check playability
         const status = playerData?.playabilityStatus?.status;
+        const reason = playerData?.playabilityStatus?.reason || '';
         if (status === 'LOGIN_REQUIRED') {
-          return new Response(JSON.stringify({ error: 'This video is private or requires login.' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+          console.log(`${client.name} returned LOGIN_REQUIRED, trying next client...`);
+          continue; // Try next client instead of failing immediately
         }
         if (status === 'ERROR' || status === 'UNPLAYABLE') {
-          return new Response(JSON.stringify({ error: 'This video is unavailable.' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+          console.log(`${client.name} returned ${status}: ${reason}`);
+          continue; // Try next client
         }
 
         // Get title
@@ -277,7 +280,7 @@ serve(async (req) => {
           if (titleMatch) videoTitle = decodeHtmlEntities(titleMatch[1].replace(/ - YouTube$/, '').trim());
 
           if (html.includes('"status":"LOGIN_REQUIRED"') && allCaptionTracks.length === 0) {
-            return new Response(JSON.stringify({ error: 'This video is private or requires login.' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+            console.log('HTML page indicates LOGIN_REQUIRED');
           }
 
           const tracks = extractCaptionTracksFromHtml(html);
@@ -303,7 +306,7 @@ serve(async (req) => {
     }
 
     if (allCaptionTracks.length === 0) {
-      return new Response(JSON.stringify({ error: 'No captions found for this video.' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      return new Response(JSON.stringify({ error: 'No captions found. This video may be private, age-restricted, or have no subtitles available. Please try a different public video with captions enabled.' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     const dedupedEntries = dedup(entries);
